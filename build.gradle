@@ -1,0 +1,115 @@
+buildscript {
+    ext {
+        springVersion = '2.1.6.RELEASE'
+        springOrmVersion = '5.2.0.RELEASE'
+        springDataJpaVersion = '2.1.6.RELEASE'
+
+        palantirVersion = '0.13.0'
+        lombokVersion = '1.18.4'
+        assertjVersion = '3.11.1'
+        apacheCommonsVersion = '3.0'
+
+        postgresDriverVersion = '42.1.4'
+        hibernateEntityVersion = '5.4.7.Final'
+        hibernateTypesVersion = '2.8.0'
+
+        jacksonVersion = '2.9.8'
+    }
+
+    repositories {
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:${springVersion}")
+        classpath("gradle.plugin.com.palantir.gradle.docker:gradle-docker:${palantirVersion}")
+        classpath("org.postgresql:postgresql:${postgresDriverVersion}")
+
+    }
+}
+
+plugins {
+    id "org.sonarqube" version "2.7"
+    id "org.flywaydb.flyway" version "6.0.8"
+}
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'com.palantir.docker'
+
+// This is used as the docker image prefix (org)
+group = 'hska'
+
+bootJar {
+    baseName = 'heicheck'
+    version =  '0.1.0'
+}
+
+// tag::task[]
+task unpack(type: Copy) {
+    dependsOn bootJar
+    from(zipTree(tasks.bootJar.outputs.files.singleFile))
+    into("build/dependency")
+}
+
+docker {
+    name "${project.group}/${bootJar.baseName}"
+    copySpec.from(tasks.unpack.outputs).into("dependency")
+    buildArgs(['DEPENDENCY': "dependency"])
+}
+
+flyway {
+    url = 'jdbc:postgresql://localhost:5432/example'
+    user = 'postgres'
+    password = 'p'
+    schemas = ['dbo']
+}
+// end::task[]
+
+repositories {
+    mavenCentral()
+}
+
+sourceCompatibility = 11
+targetCompatibility = 11
+
+dependencies {
+    // Spring
+    compile('org.springframework.boot:spring-boot-starter-webflux')
+    compile("org.springframework.boot:spring-boot-starter-data-jpa")
+    compile("org.springframework:spring-orm")
+
+    // Building a resource server with OAuth2 JWT-Tokens
+    compile('org.springframework.boot:spring-boot-starter-security')
+    compile("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+
+    compile ('org.json:json:20171018')
+
+    // Hibernate
+    compile("org.hibernate:hibernate-entitymanager:${hibernateEntityVersion}")
+    compile("org.apache.commons:commons-lang3:${apacheCommonsVersion}")
+
+    // For using specific Hybernate ENUMS
+    compile("com.vladmihalcea:hibernate-types-52:${hibernateTypesVersion}")
+
+    compile("com.fasterxml.jackson.core:jackson-core:${jacksonVersion}")
+
+    compileOnly("org.projectlombok:lombok:${lombokVersion}")
+
+    annotationProcessor("org.projectlombok:lombok:${lombokVersion}")
+
+    runtimeOnly("org.postgresql:postgresql:${postgresDriverVersion}")
+
+    testCompile("org.assertj:assertj-core:${assertjVersion}")
+    testCompile("org.springframework.boot:spring-boot-starter-test")
+    // For testing Spring Security and Webflux
+//    testImplementation("org.springframework.boot:spring-security-test")
+//    testImplementation("org.springframework.security:spring-security-test")
+//    testImplementation("io.projectreactor:reactor-test")
+    testRuntime("org.postgresql:postgresql:${postgresDriverVersion}")
+}

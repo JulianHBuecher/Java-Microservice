@@ -1,0 +1,86 @@
+version: '3'
+
+services:
+  # To stop a single container: docker-compose rm -f -s -v <name>
+  # Services setting up postgres db, and create database heicheck
+  db:
+    image: postgres
+    container_name: pgres
+    depends_on:
+      - heicheck-keycloak
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=p
+      - POSTGRES_DB=heicheck
+    networks:
+      - heicheck
+
+  # When postgres db was setup successfully, flyway executed all script from the volume
+  flyway:
+    image: flyway/flyway
+    command: -url=jdbc:postgresql://pgres/heicheck -schemas=calendar,wiki,person -user=postgres -password=p  -connectRetries=120 migrate
+    volumes:
+      - ./migration:/flyway/sql
+    depends_on:
+      - db
+    networks:
+      - heicheck
+
+  # After the initial data has be migrate to the db, the actual mircoservices will be started
+  heicheck-container:
+    image: hska/heicheck
+    container_name: booking
+    depends_on:
+      - flyway
+      - heicheck-keycloak
+    ports:
+      - "192.168.14.25:8080:8080"
+    networks:
+      - heicheck
+
+  # Now the authorization server will be started
+  heicheck-keycloak:
+    image: jboss/keycloak
+    container_name: heicloak
+    command:
+      - "-Djboss.socket.binding.port-offset=100"
+      - "-Dkeycloak.migration.action=import \
+          -Dkeycloak.migration.provider=singleFile \
+          -Dkeycloak.migration.file=/tmp/uniklinik-ldap-realm.json"
+    environment:
+      - KEYCLOAK_USER=admin
+      - KEYCLOAK_PASSWORD=p
+    ports:
+      - "192.168.14.25:8180:8180"
+    volumes:
+      - /home/$USER/deployment/HeicheckExport/uniklinik-ldap-realm.json:/tmp/uniklinik-ldap-realm.json
+    networks:
+      - heicheck
+
+  # After the initial data has be migrate to the db, the actual mircoservices will be started
+  heicheck-excel-container:
+    image: hska/excel
+    container_name: excel
+    depends_on:
+      - flyway
+    ports:
+      - "192.168.14.25:8480:8080"
+    networks:
+      - heicheck
+
+  heicheck-website:
+    image: hska/website
+    container_name: website
+    depends_on:
+      - heicheck-excel-container
+    ports:
+      - "192.168.14.25:8280:8480"
+    networks:
+      - heicheck
+
+# Setting up a network with static ip addresses and a gateway
+networks:
+ heicheck:
+  driver: bridge
+

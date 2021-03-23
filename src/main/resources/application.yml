@@ -1,0 +1,66 @@
+server:
+  # For Production:
+#  error:
+#    include-stacktrace: never
+  port: 8080
+
+#TODO: figure out why I need this here and in bootstrap.yml
+spring:
+  application:
+    name: testLatticeApp
+  # For using JSON-Data in Spring Security (Extraction of Roles)
+  jackson:
+    date-format: com.fasterxml.jackson.databind.util.StdDateFormat
+    default-property-inclusion: non_null
+  # Setting the Authorization-Server for Validation of JWT-Tokens
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8180/auth/realms/Example
+#          issuer-uri: http://heicloak:8180/auth/realms/heicheck
+#          jwk-set-uri: http://heicloak:8180/auth/realms/heicheck/protocol/openid-connect/certs
+  main:
+    allow-bean-definition-overriding: true
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        show_sql: true
+        format_sql: true
+
+logging:
+  level:
+    org:
+      hibernate:
+        SQL: debug
+        type:
+          descriptor:
+            sql: trace
+
+
+# Database
+datasource:
+  url: jdbc:postgresql://localhost:5432/example
+  username: serviceuser
+  password: serviceuser2020
+  driverClassName: org.postgresql.Driver
+
+## JPA
+jpa:
+  hibernate:
+    dialect: org.hibernate.dialect.PostgreSQL9Dialect
+    jdbc_lob_non_contextual_creation: true
+
+ribbon:
+  ServerListRefreshInterval: 1000
+
+endpoints:
+  health:
+    sensitive: false
+  restart:
+    enabled: true
+  shutdown:
+    enabled: true
+
+
